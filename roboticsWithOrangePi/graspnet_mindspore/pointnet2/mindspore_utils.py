@@ -18,16 +18,14 @@ class SharedMLP(nn.SequentialCell):
             args: List[int],
             *,
             bn: bool = False,
-            activation=nn.ReLU(inplace=True),
+            activation=nn.ReLU(),
             preact: bool = False,
-            first: bool = False,
-            name: str = ""
+            first: bool = False
     ):
         super().__init__()
 
         for i in range(len(args) - 1):
             self.append(
-                name + 'layer{}'.format(i),
                 Conv2d(
                     args[i],
                     args[i + 1],
@@ -39,11 +37,11 @@ class SharedMLP(nn.SequentialCell):
             )
 
 
-class _BNBase(nn.Sequential):
+class _BNBase(nn.SequentialCell):
 
-    def __init__(self, in_size, batch_norm=None, name=""):
+    def __init__(self, in_size, batch_norm=None):
         super().__init__()
-        self.append(name + "bn", batch_norm(in_size))
+        self.append(batch_norm(in_size))
 
 
 # class BatchNorm1d(_BNBase):
@@ -54,8 +52,8 @@ class _BNBase(nn.Sequential):
 
 class BatchNorm2d(_BNBase):
 
-    def __init__(self, in_size: int, name: str = ""):
-        super().__init__(in_size, batch_norm=nn.BatchNorm2d, name=name)
+    def __init__(self, in_size: int):
+        super().__init__(in_size, batch_norm=nn.BatchNorm2d)
 
 
 # class BatchNorm3d(_BNBase):
@@ -79,8 +77,7 @@ class _ConvBase(nn.SequentialCell):
             conv=None,
             batch_norm=None,
             bias=True,
-            preact=False,
-            name=""
+            preact=False
     ):
         super().__init__()
 
@@ -104,7 +101,7 @@ class _ConvBase(nn.SequentialCell):
                 kernel_size=kernel_size,
                 stride=stride,
                 padding=padding,
-                bias=bias
+                has_bias=bias
             )
 
         if bn:
@@ -115,19 +112,19 @@ class _ConvBase(nn.SequentialCell):
 
         if preact:
             if bn:
-                self.append(name + 'bn', bn_unit)
+                self.append( bn_unit)
 
             if activation is not None:
-                self.append(name + 'activation', activation)
+                self.append(activation)
 
-        self.append(name + 'conv', conv_unit)
+        self.append( conv_unit)
 
         if not preact:
             if bn:
-                self.append(name + 'bn', bn_unit)
+                self.append( bn_unit)
 
             if activation is not None:
-                self.append(name + 'activation', activation)
+                self.append(activation)
 
 
 # class Conv1d(_ConvBase):
@@ -173,13 +170,12 @@ class Conv2d(_ConvBase):
             *,
             kernel_size: Tuple[int, int] = (1, 1),
             stride: Tuple[int, int] = (1, 1),
-            padding: Tuple[int, int] = (0, 0),
+            padding: int = 0,
             activation=nn.ReLU(),
             bn: bool = False,
             init=HeNormal(),
             bias: bool = True,
-            preact: bool = False,
-            name: str = ""
+            preact: bool = False
     ):
         super().__init__(
             in_size,
@@ -193,8 +189,7 @@ class Conv2d(_ConvBase):
             conv=nn.Conv2d,
             batch_norm=BatchNorm2d,
             bias=bias,
-            preact=preact,
-            name=name
+            preact=preact
         )
 
 

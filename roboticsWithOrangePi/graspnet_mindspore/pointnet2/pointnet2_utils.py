@@ -4,7 +4,7 @@ import mindspore as ms
 import mindspore.nn as nn
 import mindspore.numpy as mnp
 import mindspore.ops as P
-from mindspore.common.tensor import Tensor
+from mindspore import Tensor
 from mindspore.ops.primitive import constexpr
 
 # class RandomDropout(nn.Module):
@@ -63,7 +63,7 @@ def gather_operation(features, idx):
         Parameters
         ----------
         features : torch.Tensor
-            (B, C, N) tensor
+            (B, N, C) tensor
 
         idx : torch.Tensor
             (B, npoint) tensor of the features to gather
@@ -71,9 +71,9 @@ def gather_operation(features, idx):
         Returns
         -------
         torch.Tensor
-            (B, C, npoint) tensor
+            (B, npoint, C) tensor
         """
-    return P.GatherNd()(features, idx.unsqueeze(-1).expand(idx.shape + (features.shape[1],)))
+    return P.gather(features, idx, 1, 1)
 
 def three_nn(unknown, known):
     r"""
@@ -324,7 +324,7 @@ class QueryAndGroup(nn.Cell):
             grouped_features = grouped_features.swapaxes(2, 3).swapaxes(1, 2)
             if self.use_xyz:
                 new_features = P.cat(
-                    [grouped_xyz, grouped_features], dim=1
+                    [grouped_xyz, grouped_features], axis=1
                 )  # (B, C + 3, npoint, nsample)
             else:
                 new_features = grouped_features
@@ -381,7 +381,7 @@ class GroupAll(nn.Cell):
             grouped_features = features.unsqueeze(2)
             if self.use_xyz:
                 new_features = P.cat(
-                    [grouped_xyz, grouped_features], dim=1
+                    [grouped_xyz, grouped_features], axis=1
                 )  # (B, 3 + C, 1, N)
             else:
                 new_features = grouped_features

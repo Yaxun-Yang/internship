@@ -94,14 +94,13 @@ class PointnetSAModuleVotes(nn.Cell):
             (B, npoint) tensor of the inds
         """
 
-        xyz_flipped = xyz.swapaxes(1, 2)
         if inds is None:
             inds = pointnet2_utils.furthest_point_sample(xyz, self.npoint) #(B, npoint)
         else:
             assert(inds.shape[1] == self.npoint)
         new_xyz = pointnet2_utils.gather_operation(
-            xyz_flipped, inds
-        ).swapaxes(1, 2) if self.npoint is not None else None # (B, npoint, 3)
+            xyz, inds
+        ) if self.npoint is not None else None # (B, npoint, 3)
 
         if not self.ret_unique_cnt:
             grouped_features, grouped_xyz = self.grouper(
@@ -112,16 +111,18 @@ class PointnetSAModuleVotes(nn.Cell):
                 xyz, new_xyz, features
             )  # (B, C, npoint, nsample), (B,3,npoint,nsample), (B,npoint)
 
+        print('grouped_features:', grouped_features.shape)
+
         new_features = self.mlp_module(
             grouped_features
         )  # (B, mlp[-1], npoint, nsample)
         if self.pooling == 'max':
             new_features = F.max_pool2d(
-                new_features, kernel_size=[1, new_features.size(3)]
+                new_features, kernel_size=(1, new_features.shape[3])
             )  # (B, mlp[-1], npoint, 1)
         elif self.pooling == 'avg':
             new_features = F.avg_pool2d(
-                new_features, kernel_size=[1, new_features.size(3)]
+                new_features, kernel_size=(1, new_features.shape[3])
             )  # (B, mlp[-1], npoint, 1)
         elif self.pooling == 'rbf': 
             # Use radial basis function kernel for weighted sum of features (normalized by nsample and sigma)
@@ -185,7 +186,7 @@ class PointnetFPModule(nn.Cell):
             )
         else:
             interpolated_feats = known_feats.expand(
-                *known_feats.size()[0:2], unknown.size(1)
+                *known_feats.shape[0:2], unknown.shape[1]
             )
 
         if unknow_feats is not None:
@@ -201,23 +202,24 @@ class PointnetFPModule(nn.Cell):
 
 
 
-# if __name__ == "__main__":
-#     from ms.autograd import Variable
-#     ms.manual_seed(1)
-#     ms.cuda.manual_seed_all(1)
-#     xyz = Variable(ms.randn(2, 9, 3).cuda(), requires_grad=True)
-#     xyz_feats = Variable(ms.randn(2, 9, 6).cuda(), requires_grad=True)
+if __name__ == "__main__":
+ 
+ # test PointnetSAModuleVotes
+    ms.manual_seed(1)
+    xyz = P.randn([2, 9, 3])
+    xyz_feats = P.randn([2, 9, 6])
 
-#     test_module = PointnetSAModuleMSG(
-#         npoint=2, radii=[5.0, 10.0], nsamples=[6, 3], mlps=[[9, 3], [9, 6]]
-#     )
-#     test_module.cuda()
-#     print(test_module(xyz, xyz_feats))
-
-#     for _ in range(1):
-#         _, new_features = test_module(xyz, xyz_feats)
-#         new_features.backward(
-#             ms.cuda.FloatTensor(*new_features.size()).fill_(1)
-#         )
-#         print(new_features)
-#         print(xyz.grad)
+    net = PointnetSAModuleVotes( npoint=3,
+                radius=3,
+                nsample=2,
+                mlp=[9, 3, 3, 9],
+                use_xyz=True,
+                normalize_xyz=True)
+    print(net)
+    for _ in range(1):
+        new_xyz, new_features, inds= net(xyz, xyz_feats, None)
+        new_features.backward(
+            P.fill(ms.int32,new_features.shape,1)
+        )
+        print(new_features)
+        print(xyz.grad)
